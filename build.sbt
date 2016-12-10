@@ -1,3 +1,5 @@
+import sbt.Credentials
+import sbt.Keys.credentials
 import sbt.inc.IncOptions
 
 name := "aloha"
@@ -56,7 +58,16 @@ lazy val commonSettings = Seq(
 
   // Because 2.10 runtime reflection is not thread-safe, tests fail non-deterministically.
   // This is a hack to make tests pass by not allowing the tests to run in parallel.
-  parallelExecution in Test := false
+  parallelExecution in Test := false,
+
+  publishTo := {
+    val nexus = "http://nexus.zefr.com/repository/maven"
+    if (isSnapshot.value)
+      Some("snapshots" at s"$nexus-snapshots")
+    else
+      Some("releases"  at s"$nexus-releases")
+  },
+  credentials += Credentials(Path.userHome / ".ivy2" / ".credentials")
 )
 
 lazy val versionDependentSettings = Seq(
@@ -213,7 +224,7 @@ lazy val cli = project.in(file("aloha-cli"))
 // The rest should be fairly straightforward.  Follow prompts for things like
 // and eventually enter PGP pass phrase.
 
-sonatypeProfileName := "com.eharmony"
+//sonatypeProfileName := "com.eharmony"
 
 pomExtra in Global := (
   <scm>
@@ -254,12 +265,3 @@ releaseProcess := Seq[ReleaseStep](
   ReleaseStep(action = Command.process("sonatypeReleaseAll", _), enableCrossBuild = true),
   pushChanges
 )
-
-publishTo := {
-  val nexus = "http://nexus.zefr.com/repository/maven"
-  if (isSnapshot.value)
-    Some("snapshots" at s"$nexus-snapshots")
-  else
-    Some("releases"  at s"$nexus-releases")
-}
-credentials += Credentials(file(".ivy2/.credentials"))
