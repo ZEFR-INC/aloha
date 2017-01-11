@@ -4,7 +4,7 @@ object Dependencies {
 
   val scalaToolsVersion = "1.0.4"
   val springVersion = "3.1.4.RELEASE"
-  val protobufVersion = "3.0.0"
+  val protobufVersion = "3.1.0"
   val alohaProtoVersion = "2.0.1"
 
   val scalazVersion = "7.0.6"
@@ -15,7 +15,7 @@ object Dependencies {
   val log4jVersion = "1.2.17"
 
   val vwJniVersion = "8.1.0"
-  val h2oVersion = "3.8.2.3"
+  val h2oVersion = "3.10.2.1"
   val guavaVersion = "16.0.1"
 
   val scalazCore = "org.scalaz" %% "scalaz-core" % scalazVersion

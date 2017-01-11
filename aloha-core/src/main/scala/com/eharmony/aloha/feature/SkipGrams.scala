@@ -8,6 +8,7 @@ import com.eharmony.aloha.util.SubSeqIterator
 import scala.collection.concurrent.TrieMap
 import scala.collection.parallel.mutable.ParArray
 import scala.collection.{mutable => scm}
+import scala.util.hashing.MurmurHash3
 import scala.{collection => sc}
 
 /**
@@ -25,13 +26,19 @@ import scala.{collection => sc}
 trait SkipGrams {
     import SkipGramsHelp.defaultSplitter
 
+    private[this] def minHash(maxElements: Int, tokens: sc.Map[String, Int]) = {
+      val hashedValues = tokens.map{ case(nGram, count) => (MurmurHash3.stringHash(nGram), nGram, count)}.toSeq
+      hashedValues.sortBy(_._1).take(maxElements).map{ case(_, nGram, count) => (nGram, count) }.toMap
+    }
+
     def skipGrams(str: String,
                   n: Int,
                   k: Int = 0,
                   sep: String = "_",
                   prefix: String = "=",
                   suffix: String = "",
-                  splitString: String = """\s+"""):
+                  splitString: String = """\s+""",
+                  maxElementsOpt: Option[Int] = None):
     sc.Map[String, Int] = {
         val splitter = if (splitString == defaultSplitter.pattern) defaultSplitter
                        else Pattern.compile(splitString)
@@ -56,7 +63,7 @@ trait SkipGrams {
             }
             i += 1
         }
-        m
+        maxElementsOpt.fold[sc.Map[String, Int]](m)(minHash(_, m))
     }
 
 //    def skipGrams(str: String, n: Int, k: Int = 0, prefix: String = "=", sep: String = "_", suffix: String = ""):
@@ -84,13 +91,15 @@ trait SkipGrams {
                sep: String = "_",
                prefix: String = "=",
                suffix: String = "",
-               splitString: String = """\s+"""): sc.Map[String, Int] =
-        skipGrams(s, n, 0, sep, prefix, suffix, splitString)
+               splitString: String = """\s+""",
+               maxElementsOpt: Option[Int] = None): sc.Map[String, Int] =
+        skipGrams(s, n, 0, sep, prefix, suffix, splitString, maxElementsOpt)
 
     def bag(str: String,
             prefix: String = "=",
             suffix: String = "",
-            splitString: String = """\s+"""): sc.Map[String, Int] = {
+            splitString: String = """\s+""",
+            maxElementsOpt: Option[Int] = None): sc.Map[String, Int] = {
         val splitter = if (splitString == defaultSplitter.pattern) defaultSplitter
                        else Pattern.compile(splitString)
         val tokens = splitter.split(str)
@@ -101,7 +110,7 @@ trait SkipGrams {
             m.update(token, m.getOrElse(token, 0) + 1)
             i -= 1
         }
-        m
+        maxElementsOpt.fold[sc.Map[String, Int]](m)(minHash(_, m))
     }
 
 //    def bag(s: String): sc.Map[String, Int] = nGrams(s, 1)
@@ -109,6 +118,11 @@ trait SkipGrams {
 
 trait ParallelSkipGrams {
     import SkipGramsHelp._
+
+    private[this] def minHash(maxElements: Int, tokens: TrieMap[String, AtomicInteger]) = {
+        val hashedValues = tokens.par.map{ case(nGram, count) => (MurmurHash3.stringHash(nGram), nGram, count)}.toSeq.seq
+        hashedValues.sortBy(_._1).take(maxElements).map{ case(_, nGram, count) => (nGram, count) }.toMap
+    }
 
     def partitioningIndices(n: Int, k: Int) = {
         if (n < k) Vector((0, n))
@@ -124,7 +138,8 @@ trait ParallelSkipGrams {
                   sep: String = "_",
                   prefix: String = "=",
                   suffix: String = "",
-                  splitString: String = """\s+"""):
+                  splitString: String = """\s+""",
+                  maxElementsOpt: Option[Int] = None):
     sc.Map[String, AtomicInteger]= {
         val splitter = if (splitString == defaultSplitter.pattern) defaultSplitter
                        else Pattern.compile(splitString)
@@ -152,7 +167,7 @@ trait ParallelSkipGrams {
                 i += 1
             }
         }
-        m
+        maxElementsOpt.fold[sc.Map[String, AtomicInteger]](m)(minHash(_, m))
     }
 
 
@@ -184,13 +199,15 @@ trait ParallelSkipGrams {
                sep: String = "_",
                prefix: String = "=",
                suffix: String = "",
-               splitString: String = """\s+"""): sc.Map[String, AtomicInteger] =
-        skipGrams(s, n, 0, sep, prefix, suffix, splitString)
+               splitString: String = """\s+""",
+               maxElementsOpt: Option[Int] = None): sc.Map[String, AtomicInteger] =
+        skipGrams(s, n, 0, sep, prefix, suffix, splitString, maxElementsOpt)
 
     def bag(str: String,
             prefix: String = "=",
             suffix: String = "",
-            splitString: String = """\s+"""): sc.Map[String, AtomicInteger] = {
+            splitString: String = """\s+""",
+            maxElementsOpt: Option[Int] = None): sc.Map[String, AtomicInteger] = {
         val splitter = if (splitString == defaultSplitter.pattern) defaultSplitter
                        else Pattern.compile(splitString)
         val m = TrieMap.empty[String, AtomicInteger]
@@ -199,7 +216,7 @@ trait ParallelSkipGrams {
             val c = m.getOrElseUpdate(t, new AtomicInteger(0))
             c.incrementAndGet()
         }
-        m
+        maxElementsOpt.fold[sc.Map[String, AtomicInteger]](m)(minHash(_, m))
     }
 }
 
